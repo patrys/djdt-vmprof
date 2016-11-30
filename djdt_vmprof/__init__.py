@@ -1,6 +1,7 @@
 import os.path
 import sys
 import tempfile
+import threading
 
 import vmprof
 from debug_toolbar.panels import Panel
@@ -8,6 +9,8 @@ from django.template import Context, Template
 
 from . import flamegraph
 
+
+terrible_performance = threading.Lock()
 
 TEMPLATE = r"""
 <style>
@@ -25,7 +28,9 @@ TEMPLATE = r"""
 
 def tree_to_flame(parent, node, lines):
     if ':' in node.name:
-        block_type, funcname, *rest = node.name.split(':')
+        parts = node.name.split(':')
+        block_type, funcname = parts[:2]
+        rest = parts[2:]
         if len(rest) >= 2:
             lineno = rest[0]
             filename = rest[1]
@@ -38,10 +43,10 @@ def tree_to_flame(parent, node, lines):
                     rel_name = os.path.relpath(filename, prefix)
                     suffix = '_[i]'
                     break
+            if filename.startswith(sys.prefix):
+                suffix = '_[k]'
             if not rel_name.startswith('..'):
                 filename = rel_name
-            else:
-                suffix = '_[k]'
             funcname = '%s [%s:%s]%s' % (funcname, filename, lineno, suffix)
         if parent:
             current = '%s;%s' % (parent, funcname)
@@ -50,8 +55,6 @@ def tree_to_flame(parent, node, lines):
     else:
         current = node.name
     count = node.count
-    if count > 10:
-        print(node.name, node.count)
     for c in node.children.values():
         count -= c.count
         tree_to_flame(current, c, lines)
@@ -63,10 +66,12 @@ class VMProfPanel(Panel):
 
     def process_request(self, request):
         self.output = tempfile.NamedTemporaryFile()
+        terrible_performance.acquire()
         vmprof.enable(self.output.fileno())
 
     def process_response(self, request, response):
         vmprof.disable()
+        terrible_performance.release()
 
     def generate_stats(self, request, response):
         stats = vmprof.read_profile(self.output.name)
