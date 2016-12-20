@@ -47,7 +47,7 @@ class VMProfPanel(Panel):
     def process_request(self, request):
         self.output = tempfile.NamedTemporaryFile()
         terrible_performance.acquire()
-        vmprof.enable(self.output.fileno(), 0.0005)
+        vmprof.enable(self.output.fileno())
 
     def process_response(self, request, response):
         vmprof.disable()
