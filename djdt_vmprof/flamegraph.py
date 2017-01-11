@@ -30,9 +30,10 @@ def name_to_color_mapper():
         if not name in cache:
             main_module = name.split('.')[0]
             if main_module:
-                main_hash = md5(main_module).digest()
+                main_hash = md5(main_module.encode('ascii', 'ignore'))
+                main_hash = main_hash.hexdigest()
                 hue = ord(main_hash[0])
-                full_hash = md5(name).digest()
+                full_hash = md5(name.encode('ascii', 'ignore')).hexdigest()
                 lightness = 50 + ord(full_hash[0]) // 10
                 cache[name] = 'hsla(%d, 70%%, %d%%, 0.9)' % (hue, lightness)
             else:
